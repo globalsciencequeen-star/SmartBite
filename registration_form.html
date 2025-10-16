@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Digital Wallet Registration Form</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #e8ecf1, #f2f5f9);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .glass-container {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(16px) saturate(180%);
+            -webkit-backdrop-filter: blur(16px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+        .hidden-field {
+            display: none;
+        }
+    </style>
+</head>
+<body onload="initRegistrationForm()">
+
+    <div id="mainWrapper" class="glass-container w-full max-w-md rounded-2xl p-6 md:p-8">
+        <h1 id="formTitle" class="text-3xl font-bold text-gray-800 mb-2 text-center">Enrollment</h1>
+        <p id="roleSubtitle" class="text-sm text-gray-600 mb-6 text-center"></p>
+
+        <div id="statusBar" class="p-3 rounded-xl font-medium hidden transition-all duration-300 text-sm mb-4"></div>
+
+        <form id="registrationForm" onsubmit="registerUser(event)">
+            
+            <input type="hidden" id="userRole" name="role" value="">
+
+            <div class="mb-4">
+                <label for="fullName" class="block text-gray-700 text-sm font-bold mb-2">Full Name</label>
+                <input type="text" id="fullName" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+            </div>
+            
+            <div class="mb-4">
+                <label for="email" class="block text-gray-700 text-sm font-bold mb-2">Email (Used for Staff ID generation)</label>
+                <input type="email" id="email" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+            </div>
+            
+            <div id="studentFields" class="hidden-field">
+                <div class="mb-4">
+                    <label for="admissionNo" class="block text-gray-700 text-sm font-bold mb-2">
+                        Admission No. (Your unique Wallet ID)
+                    </label>
+                    <input type="text" id="admissionNo" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g., S12345" required>
+                </div>
+                <div class="mb-6">
+                    <label for="studentPassword" class="block text-gray-700 text-sm font-bold mb-2">
+                        5-Digit Wallet Password (Used for Payments)
+                    </label>
+                    <input type="password" id="studentPassword" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g., 12345" maxlength="5" pattern="\d{5}">
+                </div>
+            </div>
+
+            <div id="staffFields" class="mb-6 hidden-field">
+                <label for="staffAccessCode" class="block text-gray-700 text-sm font-bold mb-2">
+                    Staff Access Code (4-digits)
+                </label>
+                <input type="password" id="staffAccessCode" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Set a 4-digit code" maxlength="4" pattern="\d{4}">
+            </div>
+
+            <button type="submit" 
+                    class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 w-full transition duration-150">
+                Complete Registration
+            </button>
+        </form>
+    </div>
+
+    <script>
+        const LOCAL_STORAGE_KEY = 'canteen_user_data';
+        // NEW GLOBAL KEY: This is necessary to find a student's data using only their Admission No.
+        const ALL_STUDENTS_KEY = 'all_student_admissions'; 
+
+        function getQueryParam(param) {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get(param);
+        }
+
+        function toggleRoleFields(role) {
+            const formTitle = document.getElementById('formTitle');
+            const roleSubtitle = document.getElementById('roleSubtitle');
+            const studentFields = document.getElementById('studentFields');
+            const staffFields = document.getElementById('staffFields');
+            
+            const studentPassword = document.getElementById('studentPassword');
+            const staffAccessCode = document.getElementById('staffAccessCode');
+            // NEW ELEMENT
+            const admissionNo = document.getElementById('admissionNo'); 
+
+            if (role === 'student') {
+                formTitle.textContent = "Student Enrollment";
+                roleSubtitle.textContent = "Please set your wallet password. Initial balance is ₹500.00."; 
+                
+                studentFields.classList.remove('hidden-field');
+                staffFields.classList.add('hidden-field');
+                
+                studentPassword.setAttribute('required', 'required');
+                admissionNo.setAttribute('required', 'required'); // NEW REQUIREMENT
+                staffAccessCode.removeAttribute('required');
+            } else if (role === 'staff') {
+                formTitle.textContent = "Staff Enrollment";
+                roleSubtitle.textContent = "Please set your access code to generate your Staff ID.";
+
+                studentFields.classList.add('hidden-field');
+                staffFields.classList.remove('hidden-field');
+                
+                staffAccessCode.setAttribute('required', 'required');
+                studentPassword.removeAttribute('required');
+                admissionNo.removeAttribute('required'); // NEW REQUIREMENT
+            }
+        }
+
+        function initRegistrationForm() {
+            if (typeof lucide !== 'undefined') { lucide.createIcons(); }
+
+            const role = getQueryParam('role');
+            const userRoleInput = document.getElementById('userRole');
+            
+            if (!role || (role !== 'student' && role !== 'staff')) {
+                window.location.href = 'registration.html';
+                return;
+            }
+
+            userRoleInput.value = role;
+            toggleRoleFields(role);
+
+            const savedData = localStorage.getItem(LOCAL_STORAGE_KEY);
+            if (savedData) {
+                window.location.href = 'qr_display.html';
+            }
+        }
+        
+        // This function is kept simple for staff ID generation
+        function generateAccountId(email) {
+            const prefix = email.split('@')[0].toUpperCase().substring(0, 4);
+            const randomSuffix = Math.floor(10000 + Math.random() * 90000); // 5-digit ID suffix
+            return prefix + randomSuffix;
+        }
+
+        function registerUser(event) {
+            event.preventDefault();
+
+            const role = document.getElementById('userRole').value; 
+            
+            if (!role) {
+                alert("Error: Role not set. Returning to selection screen.");
+                window.location.href = 'registration.html';
+                return;
+            }
+
+            const fullName = document.getElementById('fullName').value;
+            const email = document.getElementById('email').value;
+            
+            let userData = {
+                n: fullName, 
+                e: email, 
+                r: role 
+            };
+            
+            if (role === 'student') {
+                const admissionNo = document.getElementById('admissionNo').value.trim();
+
+                // --- VALIDATION: Check for existing Admission No. in ALL_STUDENTS_KEY ---
+                let allAdmissions = JSON.parse(localStorage.getItem(ALL_STUDENTS_KEY) || '{}');
+                if (allAdmissions[admissionNo]) {
+                    alert(`Error: Admission No. ${admissionNo} is already registered.`);
+                    return;
+                }
+                
+                userData.a = admissionNo; // 'a' (Account ID) is now the Admission No.
+                userData.b = 500.00; // Hardcoded initial balance
+                userData.p = document.getElementById('studentPassword').value; 
+                
+                // Save Admission No. to the global lookup table
+                allAdmissions[admissionNo] = btoa(JSON.stringify(userData)); // Store the encrypted string
+                localStorage.setItem(ALL_STUDENTS_KEY, JSON.stringify(allAdmissions));
+
+            } else if (role === 'staff') {
+                // Staff still use the generated ID logic
+                userData.a = generateAccountId(email); 
+                userData.p = document.getElementById('staffAccessCode').value; 
+            }
+            
+            const encodedData = btoa(JSON.stringify(userData));
+            localStorage.setItem(LOCAL_STORAGE_KEY, encodedData);
+            
+            const statusBar = document.getElementById('statusBar');
+            statusBar.innerHTML = `<i data-lucide="check-circle" class="w-4 h-4 mr-2 inline-block align-middle"></i>Registration Successful! Redirecting...`;
+            statusBar.classList.remove('hidden', 'bg-yellow-100', 'text-yellow-800');
+            statusBar.classList.add('bg-green-100', 'text-green-800');
+
+            setTimeout(() => {
+                window.location.href = 'qr_display.html';
+            }, 1500);
+        }
+    </script>
+</body>
+</html>

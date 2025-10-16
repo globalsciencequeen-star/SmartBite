@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Canteen Staff Unlock QR</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrious/dist/qrious.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .container {
+            background: #ffffff;
+            border: 1px solid #bae6fd;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body onload="generateStaffQR()">
+
+    <div class="container w-full max-w-sm rounded-2xl p-6 text-center">
+        <div class="flex items-center justify-center mb-4 text-indigo-600">
+            <i data-lucide="scan" class="w-8 h-8 mr-2"></i>
+            <h1 class="text-2xl font-bold text-gray-800">Staff Transaction QR</h1>
+        </div>
+        <p class="text-sm text-gray-600 mb-6">
+            Scan this code on the **student's wallet screen** (`canteen.html`) to unlock the **transaction hub**.
+        </p>
+        
+        <div class="p-6 bg-white rounded-xl shadow-inner inline-block border border-gray-100">
+            <canvas id="staffQrCanvas" width="250" height="250" class="rounded-lg shadow-md"></canvas>
+        </div>
+
+        <p class="mt-6 text-xs text-gray-400">This QR generates a secure unlock token for student wallets.</p>
+        
+        <button onclick="window.location.href='qr_display.html'" 
+                class="mt-4 w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg transition duration-150">
+            Go Back
+        </button>
+    </div>
+
+    <script>
+        const UNLOCK_TOKEN = 'STAFF_QR_UNLOCK_TOKEN';
+
+        function generateStaffQR() {
+            if (typeof lucide !== 'undefined') { lucide.createIcons(); }
+
+            const qrCanvas = document.getElementById('staffQrCanvas');
+            
+            // Get the base path and explicitly target canteen.html
+            const basePath = window.location.href.replace(/staff_unlock_qr\.html.*$/, 'canteen.html');
+            
+            // The QR Data includes the unlock parameter
+            const qrData = `${basePath}?unlock=${UNLOCK_TOKEN}`; 
+
+            new QRious({
+                element: qrCanvas,
+                value: qrData, 
+                size: 250
+            });
+        }
+    </script>
+</body>
+</html>

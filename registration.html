@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Canteen Wallet Setup</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #e0f2fe, #f0f9ff);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: #ffffff;
+            border: 1px solid #bae6fd;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container w-full max-w-sm rounded-2xl p-8 text-center">
+        <i data-lucide="wallet" class="w-10 h-10 text-blue-600 mx-auto mb-4"></i>
+        <h1 class="text-3xl font-bold text-gray-800 mb-2">Welcome</h1>
+        <p class="text-sm text-gray-600 mb-8">
+            Please select your role to begin registration.
+        </p>
+
+        <button onclick="location.href='registration_form.html?role=student'"
+                class="w-full mb-4 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-150">
+            I'm a Student (Register Wallet)
+        </button>
+
+        <button onclick="location.href='registration_form.html?role=staff'"
+                class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition duration-150">
+            I'm Staff (Register Access ID)
+        </button>
+        
+        <p class="text-xs text-gray-400 mt-4">Note: Existing users will be redirected to their Digital ID.</p>
+    </div>
+
+    <script>
+        if (typeof lucide !== 'undefined') { lucide.createIcons(); }
+
+        // Immediately redirect existing users
+        const LOCAL_STORAGE_KEY = 'canteen_user_data';
+        if (localStorage.getItem(LOCAL_STORAGE_KEY)) {
+            window.location.href = 'qr_display.html';
+        }
+    </script>
+</body>
+</html>

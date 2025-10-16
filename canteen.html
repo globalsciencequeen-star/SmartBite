@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Canteen Wallet Access</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* --- General Styling --- */
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #e8ecf1, #f2f5f9);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .glass-container {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(16px) saturate(180%);
+            -webkit-backdrop-filter: blur(16px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+        .input-style {
+            padding: 12px 16px;
+            font-size: 15px;
+            border: 1px solid #d6dae0;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.9);
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+            transition: border 0.2s, background-color 0.2s;
+        }
+        .input-style:focus {
+            outline: none;
+            border-color: #4685ff;
+            background: rgba(255, 255, 255, 1);
+        }
+        /* --- Scrollbar Customization for better UX --- */
+        #menuTabContent::-webkit-scrollbar, #historyListHome::-webkit-scrollbar, #historyListCanteen::-webkit-scrollbar, #cartItems::-webkit-scrollbar {
+            width: 6px;
+        }
+        #menuTabContent::-webkit-scrollbar-thumb, #historyListHome::-webkit-scrollbar-thumb, #historyListCanteen::-webkit-scrollbar-thumb, #cartItems::-webkit-scrollbar-thumb {
+            background-color: rgba(70, 133, 255, 0.5);
+            border-radius: 10px;
+        }
+        #menuTabContent::-webkit-scrollbar-track, #historyListHome::-webkit-scrollbar-track, #historyListCanteen::-webkit-scrollbar-track, #cartItems::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+<body onload="initCanteen()">
+
+    <div id="mainWrapper" class="glass-container w-full max-w-lg md:max-w-6xl rounded-2xl p-6 md:p-8">
+
+        <div id="statusBar" class="p-3 rounded-xl font-medium hidden transition-all duration-300 text-sm mb-4"></div>
+        
+        <div id="roleSelectionView" class="max-w-xl mx-auto text-center p-8 rounded-2xl bg-white hidden">
+            <i data-lucide="scan" class="w-10 h-10 text-blue-600 mx-auto mb-4"></i>
+            <h2 class="text-2xl font-bold text-gray-800 mb-6">Welcome to the Wallet System</h2>
+            
+            <div class="space-y-4">
+                <button onclick="selectRole('student')"
+                    class="w-full py-4 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-xl transition-all duration-200 shadow-lg flex items-center justify-center">
+                    <i data-lucide="user" class="w-5 h-5 mr-3"></i>
+                    I am a **Student** (Show Status/History)
+                </button>
+                <button onclick="selectRole('staff')"
+                    class="w-full py-4 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold rounded-xl transition-all duration-200 shadow-lg flex items-center justify-center">
+                    <i data-lucide="utensils-crossed" class="w-5 h-5 mr-3"></i>
+                    I am **Canteen Staff** (Unlock Ordering Mode)
+                </button>
+            </div>
+        </div>
+
+        <div id="staffUnlockPrompt" class="max-w-md mx-auto hidden text-center p-8 bg-yellow-50 rounded-xl border border-yellow-300">
+            <i data-lucide="shield-alert" class="w-10 h-10 text-yellow-600 mx-auto mb-4"></i>
+            <h2 class="text-2xl font-bold text-yellow-800 mb-3">Canteen Access Required</h2>
+            <p class="text-gray-600 mb-6">
+                To enable ordering and recharge, please scan the **Staff Unlock QR** or manually enter the **Canteen Key**. This key is required **once per shift/browser session**.
+            </p>
+            
+            <input type="password" id="staffUnlockKeyInput" placeholder="Enter 13-Character Canteen Key" 
+                   class="input-style mb-3 w-full" required minlength="13" maxlength="13" />
+
+            <div id="unlockMessage" class="text-sm text-red-500 mb-4 hidden font-medium"></div>
+
+            <button onclick="attemptManualUnlock()" 
+                class="w-full py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold rounded-xl transition-all duration-200 active:scale-[.99] flex items-center justify-center">
+                 <i data-lucide="key-round" class="w-4 h-4 mr-2"></i> Unlock Canteen Mode
+            </button>
+            
+            <button onclick="showRoleSelection()" class="mt-4 text-sm text-blue-600 font-medium hover:underline flex items-center justify-center mx-auto">
+                <i data-lucide="arrow-left" class="w-4 h-4 mr-1"></i> Go back to Role Selection
+            </button>
+        </div>
+
+        <div id="unauthorizedView" class="max-w-md mx-auto hidden text-center p-8 bg-red-50 rounded-xl border border-red-300">
+            <i data-lucide="lock" class="w-10 h-10 text-red-500 mx-auto mb-4"></i>
+            <h2 class="text-2xl font-bold text-red-800 mb-3">Wallet Not Found</h2>
+            <p class="text-gray-600 mb-6">Please return to the <a href="registration.html" class="text-blue-600 font-medium hover:underline">Registration Page</a> to set up your QR ID first.</p>
+        </div>
+
+        <div id="homeView" class="hidden w-full max-w-4xl mx-auto">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b pb-4">
+                <h1 class="text-3xl font-extrabold text-gray-800 flex items-center mb-2 md:mb-0">
+                    <i data-lucide="wallet" class="w-7 h-7 mr-3 text-green-600"></i>
+                    <span id="displayNameHome"></span>'s Wallet Status
+                </h1>
+                <div class="flex items-center p-2 rounded-xl bg-green-100 border border-green-300 shadow-sm">
+                    <i data-lucide="landmark" class="w-5 h-5 mr-2 text-green-600"></i>
+                    <span class="text-green-700 font-bold">Balance:</span>
+                    <span id="walletBalanceHome" class="font-bold ml-1 text-green-700 text-xl">₹0.00</span>
+                </div>
+            </div>
+
+            <h2 class="text-xl font-bold text-gray-700 mb-4 flex items-center">
+                <i data-lucide="history" class="w-5 h-5 mr-2"></i> Transaction History
+            </h2>
+            <div id="historyListHome" class="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+                <p class="text-gray-500 italic p-4 text-center">Loading history...</p>
+            </div>
+            
+            <div class="mt-8 pt-4 border-t text-center">
+                <button onclick="showRoleSelection()" class="mt-2 text-sm text-gray-500 hover:text-gray-700 font-medium flex items-center mx-auto">
+                    <i data-lucide="refresh-cw" class="w-4 h-4 mr-1"></i> Scan Another ID / Change Role
+                </button>
+            </div>
+        </div>
+
+        <div id="canteenView" class="hidden w-full">
+            <div class="mb-4">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 border-b pb-4">
+                    <h1 class="text-3xl font-extrabold text-gray-800 mb-2 md:mb-0">Canteen Order (Menu)</h1>
+                    <div id="userInfoCanteen" class="flex items-center text-sm text-gray-600">
+                        <i data-lucide="user-circle" class="w-5 h-5 mr-1 text-blue-500"></i>
+                        <span id="displayUserIdCanteen" class="font-medium"></span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex justify-start border-b mb-6 text-lg font-semibold">
+                <button onclick="setTabView('menu')" id="menuTabBtn" class="py-2 px-4 border-b-2 border-blue-600 text-blue-600 flex items-center transition-colors duration-200">
+                    <i data-lucide="utensils" class="w-5 h-5 mr-2"></i> Food Menu
+                </button>
+                <button onclick="setTabView('history')" id="historyTabBtn" class="py-2 px-4 border-b-2 border-transparent text-gray-500 hover:text-gray-700 flex items-center transition-colors duration-200 ml-4">
+                    <i data-lucide="history" class="w-5 h-5 mr-2"></i> History
+                </button>
+            </div>
+            
+            <div class="flex flex-col md:flex-row gap-6">
+                <div class="md:w-3/5">
+                    <div id="menuTabContent" class="space-y-4 max-h-[65vh] overflow-y-auto pr-2"></div>
+                    <div id="historyTabContent" class="hidden">
+                        <div id="historyListCanteen" class="space-y-4 max-h-[65vh] overflow-y-auto pr-2"></div>
+                    </div>
+                </div>
+                <div class="md:w-2/5">
+                    <div class="sticky top-4 p-5 bg-white bg-opacity-80 backdrop-blur-md rounded-xl border border-gray-200 shadow-xl">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-xl font-semibold text-blue-600 flex items-center">
+                                <i data-lucide="shopping-cart" class="w-5 h-5 mr-2"></i> Your Cart
+                            </h3>
+                            <button onclick="openRechargeModal()" class="px-2 py-0.5 text-sm bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors font-medium">
+                                <i data-lucide="plus-circle" class="w-3 h-3 inline-block mr-1"></i> Recharge
+                            </button>
+                        </div>
+                        <div id="walletBalanceCanteenDiv" class="flex justify-between items-center p-2 rounded-lg bg-green-50 text-green-700 font-bold mb-4">
+                             <span>Wallet Balance:</span>
+                             <span id="walletBalanceCanteen">₹0.00</span>
+                        </div>
+                        
+                        <div id="cartItems" class="space-y-3 min-h-[50px] max-h-48 overflow-y-auto pr-1">
+                            <p id="emptyCartMessage" class="text-gray-500 italic">Cart is empty. Time to snack!</p>
+                        </div>
+
+                        <div class="mt-4 pt-4 border-t border-gray-300">
+                            <div class="flex justify-between items-center font-bold text-lg text-gray-800">
+                                <span>Order Total:</span>
+                                <span id="cartTotal">₹0.00</span>
+                            </div>
+                        </div>
+
+                        <button onclick="openPasswordModal()" id="checkoutButton" disabled
+                            class="mt-6 w-full py-3 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg active:scale-[.99] flex items-center justify-center">
+                            <i data-lucide="receipt-text" class="w-4 h-4 mr-2"></i>
+                            Secure Checkout
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-8 pt-4 border-t text-center">
+                <button onclick="exitCanteenMode(true)" class="text-sm text-gray-500 hover:text-gray-700 font-medium flex items-center mx-auto">
+                    <i data-lucide="log-out" class="w-4 h-4 mr-1"></i> Log Out & Exit Canteen Mode
+                </button>
+                <button onclick="showRoleSelection()" class="mt-2 text-xs text-gray-500 hover:text-gray-700 font-medium flex items-center mx-auto">
+                    <i data-lucide="refresh-cw" class="w-3 h-3 mr-1"></i> Scan Another ID / Change Role
+                </button>
+            </div>
+        </div>
+        
+        <div id="passwordModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 flex justify-center items-center z-50 p-4">
+            <div class="glass-container w-full max-w-sm rounded-xl p-6">
+                <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                    <i data-lucide="shield-check" class="w-5 h-5 mr-2 text-blue-600"></i>
+                    Authorize Payment
+                </h3>
+                <p class="text-sm text-gray-600 mb-4">
+                    Confirm transaction of <strong id="modalTotal">₹0.00</strong>. Enter user's Admission ID and PIN for security.
+                </p>
+
+                <input type="text" id="paymentAdmissionId" placeholder="Admission ID (e.g., S12345)" class="input-style mb-3 w-full" required />
+                <input type="password" id="paymentPassword" placeholder="5-digit PIN/Password" class="input-style mb-4 w-full" required minlength="5" maxlength="5" /> 
+
+                <div id="modalMessage" class="text-sm text-red-500 mb-4 hidden font-medium"></div>
+
+                <div class="flex space-x-3">
+                    <button onclick="closePasswordModal()"
+                        class="w-1/2 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold rounded-xl transition-all duration-200 active:scale-[.98]">
+                        Cancel
+                    </button>
+                    <button onclick="processPayment()"
+                        class="w-1/2 py-2 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-xl transition-all duration-200 active:scale-[.98]">
+                        Pay Now
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div id="rechargeModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 flex justify-center items-center z-50 p-4">
+            <div class="glass-container w-full max-w-sm rounded-xl p-6">
+                <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                    <i data-lucide="smartphone" class="w-5 h-5 mr-2 text-yellow-600"></i>
+                    Simulated UPI Recharge
+                </h3>
+                <p id="rechargeInfo" class="text-sm text-gray-600 mb-4">
+                    Enter the amount and confirm using your registered email/UPI ID.
+                </p>
+
+                <input type="number" id="rechargeAmount" placeholder="Amount (e.g., 200)" class="input-style mb-3 w-full" required min="10" />
+                <input type="email" id="upiId" placeholder="Enter user's registered Email ID" class="input-style mb-4 w-full" required />
+
+                <div id="rechargeMessage" class="text-sm text-red-500 mb-4 hidden font-medium"></div>
+
+                <div class="flex space-x-3">
+                    <button onclick="closeRechargeModal()"
+                        class="w-1/2 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold rounded-xl transition-all duration-200 active:scale-[.98]">
+                        Cancel
+                    </button>
+                    <button onclick="processUpiRecharge()"
+                        class="w-1/2 py-2 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold rounded-xl transition-all duration-200 active:scale-[.98]">
+                        Pay & Recharge
+                    </button>
+                </div>
+            </div>
+        </div>
+
+
+    <script>
+        // --- Global State & Data ---
+        let currentUser = null; 
+        let cart = []; 
+        let transactionHistory = []; 
+        let currentOrderId = 1000;
+        const LOCAL_STORAGE_KEY = 'canteen_user_data';
+        const LOCAL_HISTORY_KEY = 'canteen_history';
+        const CANTEEN_SESSION_KEY = 'canteen_mode_unlocked'; 
+        const CANTEEN_UNLOCK_KEY = 'CANTN-M0D3-25'; 
+        const ALL_STUDENTS_KEY = 'all_student_admissions';
+
+        // --- DOM Element References ---
+        let roleSelectionView, staffUnlockPrompt, unauthorizedView, homeView, canteenView;
+        let staffUnlockKeyInput, unlockMessage;
+        let statusBar;
+        let displayNameHome, walletBalanceHome, historyListHome;
+        let displayUserIdCanteen, walletBalanceCanteen, historyListCanteen;
+        let menuTabContent, historyTabContent, menuTabBtn, historyTabBtn;
+        let cartItemsDiv, cartTotalSpan, emptyCartMessage, checkoutButton;
+        let passwordModal, modalTotal, paymentPasswordInput, paymentAdmissionIdInput, modalMessage;
+        let rechargeModal, rechargeAmountInput, upiIdInput, rechargeMessage, rechargeInfo; 
+        
+        const foodItems = [
+          { id: 101, name: 'Margherita Pizza (Slice)', price: 80.00, description: 'Classic cheese and tomato slice', calories: 250 },
+          { id: 102, name: 'Aloo Patty Burger', price: 45.00, description: 'Crispy potato patty with fresh veggies and mint mayo', calories: 320 },
+          { id: 103, name: 'Masala Samosa (2 pcs)', price: 30.00, description: 'Spiced potato filling, deep-fried pastry', calories: 360 },
+          { id: 104, name: 'Vada Pav', price: 25.00, description: 'Spicy potato fritter in a soft bun', calories: 200 },
+          { id: 105, name: 'Plain Curd/Yogurt', price: 30.00, description: 'Probiotic, unsweetened fresh curd cup', calories: 100 },
+          { id: 106, name: 'Vegetable Chowmein', price: 75.00, description: 'Stir-fried noodles with mixed vegetables', calories: 380 },
+          { id: 107, name: 'Fresh Fruit Salad', price: 85.00, description: 'Mixed seasonal fruits (apple, banana, grapes)', calories: 120 },
+          { id: 108, name: 'Chicken Kathi Roll', price: 110.00, description: 'Spiced chicken chunks wrapped in a paratha', calories: 450 },
+          { id: 109, name: 'Rajma Chawal (Plate)', price: 95.00, description: 'Kidney beans curry with steamed rice', calories: 400 },
+          { id: 110, name: 'Orange Juice (Fresh)', price: 50.00, description: '100% natural, freshly squeezed juice', calories: 180 },
+        ];
+
+
+        // --- Utility Functions ---
+        
+        function formatIndianRupee(amount) {
+            return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount);
+        }
+
+        function showStatusMessage(message, type = 'info') {
+            const el = document.getElementById('statusBar');
+            if (typeof message === 'string') { el.textContent = message; } else { el.innerHTML = message; }
+            
+            el.className = 'p-3 rounded-xl font-medium transition-all duration-300 text-sm mb-4 border';
+            if (type === 'success') { el.classList.add('bg-green-100', 'text-green-700', 'border-green-300'); } 
+            else if (type === 'error') { el.classList.add('bg-red-100', 'text-red-700', 'border-red-300'); } 
+            else if (type === 'warning') { el.classList.add('bg-yellow-100', 'text-yellow-700', 'border-yellow-300'); } 
+            else { el.classList.add('bg-gray-100', 'text-gray-600', 'border-gray-300'); }
+
+            el.classList.remove('hidden');
+            if (type !== 'error' && !el.querySelector('a')) { setTimeout(() => { el.classList.add('hidden'); }, 4000); }
+            if (typeof lucide !== 'undefined') { lucide.createIcons(); }
+        }
+
+
+        // --- Initialization and Role Selection ---
+        
+        function initCanteen() {
+            roleSelectionView = document.getElementById('roleSelectionView');
+            staffUnlockPrompt = document.getElementById('staffUnlockPrompt');
+            unauthorizedView = document.getElementById('unauthorizedView');
+            homeView = document.getElementById('homeView');
+            canteenView = document.getElementById('canteenView');
+            staffUnlockKeyInput = document.getElementById('staffUnlockKeyInput');
+            unlockMessage = document.getElementById('unlockMessage');
+            statusBar = document.getElementById('statusBar');
+            displayNameHome = document.getElementById('displayNameHome');
+            walletBalanceHome = document.getElementById('walletBalanceHome');
+            historyListHome = document.getElementById('historyListHome');
+            displayUserIdCanteen = document.getElementById('displayUserIdCanteen');
+            walletBalanceCanteen = document.getElementById('walletBalanceCanteen');
+            historyListCanteen = document.getElementById('historyListCanteen');
+            menuTabContent = document.getElementById('menuTabContent');
+            historyTabContent = document.getElementById('historyTabContent');
+            menuTabBtn = document.getElementById('menuTabBtn');
+            historyTabBtn = document.getElementById('historyTabBtn');
+            cartItemsDiv = document.getElementById('cartItems');
+            cartTotalSpan = document.getElementById('cartTotal');
+            emptyCartMessage = document.getElementById('emptyCartMessage');
+            checkoutButton = document.getElementById('checkoutButton');
+            passwordModal = document.getElementById('passwordModal');
+            modalTotal = document.getElementById('modalTotal');
+            paymentPasswordInput = document.getElementById('paymentPassword');
+            paymentAdmissionIdInput = document.getElementById('paymentAdmissionId');
+            modalMessage = document.getElementById('modalMessage');
+            rechargeModal = document.getElementById('rechargeModal');
+            rechargeAmountInput = document.getElementById('rechargeAmount');
+            upiIdInput = document.getElementById('upiId');
+            rechargeMessage = document.getElementById('rechargeMessage');
+            rechargeInfo = document.getElementById('rechargeInfo');
+            
+            if (typeof lucide !== 'undefined') { lucide.createIcons(); }
+
+            // Check for staff unlock token in URL (from a staff QR scan)
+            const urlParams = new URLSearchParams(window.location.search);
+            const unlockParam = urlParams.get('unlock'); 
+
+            if (unlockParam === CANTEEN_UNLOCK_KEY) {
+                sessionStorage.setItem(CANTEEN_SESSION_KEY, 'true');
+                history.replaceState(null, '', window.location.pathname); 
+                loadUserDataAndRender(true); 
+            } else {
+                showRoleSelection();
+            }
+        }
+        
+        function showRoleSelection() {
+            [roleSelectionView, staffUnlockPrompt, unauthorizedView, homeView, canteenView].forEach(el => el.classList.add('hidden'));
+            roleSelectionView.classList.remove('hidden');
+            currentUser = null;
+            cart = [];
+            transactionHistory = [];
+        }
+
+        function selectRole(role) {
+            [roleSelectionView, staffUnlockPrompt, unauthorizedView, homeView, canteenView].forEach(el => el.classList.add('hidden'));
+            
+            if (role === 'student') {
+                loadUserDataAndRender(false);
+            } else if (role === 'staff') {
+                if (sessionStorage.getItem(CANTEEN_SESSION_KEY) === 'true') {
+                    loadUserDataAndRender(true);
+                } else {
+                    staffUnlockPrompt.classList.remove('hidden');
+                    staffUnlockKeyInput.value = '';
+                    unlockMessage.classList.add('hidden');
+                }
+            }
+        }
+        
+        function attemptManualUnlock() {
+            const key = staffUnlockKeyInput.value.trim();
+            unlockMessage.classList.add('hidden');
+
+            if (key === CANTEEN_UNLOCK_KEY) {
+                sessionStorage.setItem(CANTEEN_SESSION_KEY, 'true');
+                showStatusMessage('Canteen Access Granted! Please select the Staff role again.', 'success');
+                selectRole('staff');
+            } else {
+                unlockMessage.textContent = 'Invalid key. Please try again or scan the QR code.';
+                unlockMessage.classList.remove('hidden');
+            }
+        }
+
+
+        function loadUserDataAndRender(isStaffMode) {
+            const savedData = localStorage.getItem(LOCAL_STORAGE_KEY);
+            const historyData = localStorage.getItem(LOCAL_HISTORY_KEY);
+            
+            staffUnlockPrompt.classList.add('hidden');
+
+            if (!savedData) {
+                unauthorizedView.classList.remove('hidden');
+                return;
+            }
+
+            try {
+                const loadedUserData = JSON.parse(atob(savedData));
+                
+                // IMPORTANT: If a student's data is loaded, we pull the *latest* version from the global student list.
+                if (loadedUserData.r === 'student') {
+                    const allAdmissions = JSON.parse(localStorage.getItem(ALL_STUDENTS_KEY) || '{}');
+                    const latestDataEncoded = allAdmissions[loadedUserData.a];
+                    if (latestDataEncoded) {
+                        const latestUserData = JSON.parse(atob(latestDataEncoded));
+                        // Overwrite the possibly stale localStorage data with the latest data from the lookup table
+                        loadedUserData.b = parseFloat(latestUserData.b); 
+                        loadedUserData.p = latestUserData.p;
+                        // Also update the local storage to keep the QR data current
+                        localStorage.setItem(LOCAL_STORAGE_KEY, latestDataEncoded);
+                    }
+                }
+
+                currentUser = {
+                    name: loadedUserData.n,
+                    admissionId: loadedUserData.a,
+                    email: loadedUserData.e,
+                    password: loadedUserData.p,
+                    balance: parseFloat(loadedUserData.b || 0), // Use 0 if balance is missing
+                    role: loadedUserData.r
+                };
+                
+                // If it's a student, the history is per-user, so we load the right key
+                if(currentUser.role === 'student') {
+                    const studentHistoryKey = `canteen_history_${currentUser.admissionId}`;
+                    transactionHistory = localStorage.getItem(studentHistoryKey) ? JSON.parse(localStorage.getItem(studentHistoryKey)) : [];
+                } else {
+                    transactionHistory = historyData ? JSON.parse(historyData) : [];
+                }
+
+
+                if (isStaffMode && sessionStorage.getItem(CANTEEN_SESSION_KEY) === 'true') {
+                    canteenView.classList.remove('hidden');
+                    showStatusMessage(`Canteen Ordering Mode is ACTIVE. Now serving ${currentUser.name}.`, 'success');
+                    updateCanteenView();
+                } else {
+                    homeView.classList.remove('hidden');
+                    updateHomeView();
+                    renderHistory(transactionHistory, historyListHome);
+                    showStatusMessage(`Status for ${currentUser.name} loaded.`, 'info');
+                }
+
+            } catch (error) {
+                console.error("Error loading stored user data:", error);
+                unauthorizedView.classList.remove('hidden');
+            }
+        }
+        
+        function updateWalletDisplay() {
+            const formattedBalance = formatIndianRupee(currentUser.balance);
+            if (walletBalanceHome) walletBalanceHome.textContent = formattedBalance;
+            if (walletBalanceCanteen) walletBalanceCanteen.textContent = formattedBalance;
+        }
+        
+        function updateHomeView() {
+            displayNameHome.textContent = currentUser.name;
+            updateWalletDisplay();
+        }
+
+        function updateCanteenView() {
+            displayUserIdCanteen.textContent = `Serving: ${currentUser.name} (ID: ${currentUser.admissionId})`;
+            updateWalletDisplay();
+            renderMenu();
+            updateCartDisplay();
+            setTabView('menu');
+        }
+        
+        function exitCanteenMode(logout = false) {
+            if (logout) {
+                showRoleSelection();
+                sessionStorage.removeItem(CANTEEN_SESSION_KEY);
+            } else {
+                showRoleSelection();
+            }
+        }
+        
+        // --- Tab and Menu Functions ---
+        
+        function setTabView(view) {
+            menuTabContent.classList.toggle('hidden', view !== 'menu');
+            historyTabContent.classList.toggle('hidden', view !== 'history');
+            
+            menuTabBtn.classList.remove('border-blue-600', 'text-blue-600', 'border-transparent', 'text-gray-500', 'hover:text-gray-700');
+            historyTabBtn.classList.remove('border-blue-600', 'text-blue-600', 'border-transparent', 'text-gray-500', 'hover:text-gray-700');
+
+            if (view === 'menu') {
+                menuTabBtn.classList.add('border-blue-600', 'text-blue-600');
+                historyTabBtn.classList.add('border-transparent', 'text-gray-500', 'hover:text-gray-700');
+            } else {
+                historyTabBtn.classList.add('border-blue-600', 'text-blue-600');
+                menuTabBtn.classList.add('border-transparent', 'text-gray-500', 'hover:text-gray-700');
+                renderHistory(transactionHistory, historyListCanteen);
+            }
+        }
+
+        function renderMenu() {
+            menuTabContent.innerHTML = foodItems.map(item => `
+                <div class="flex justify-between items-center p-4 bg-white rounded-xl shadow-md border border-gray-100">
+                    <div class="flex-grow">
+                        <h4 class="text-lg font-bold text-gray-800">${item.name}</h4>
+                        <p class="text-sm text-gray-500">${item.description}</p>
+                        <p class="text-xs text-gray-400 mt-1">${item.calories} Calories</p>
+                    </div>
+                    <div class="text-right flex items-center">
+                        <span class="text-xl font-extrabold text-green-600 mr-4">${formatIndianRupee(item.price)}</span>
+                        <button onclick="addToCart(${item.id})" class="bg-blue-500 hover:bg-blue-600 text-white p-2 rounded-full transition-all duration-150 shadow-lg active:scale-95">
+                            <i data-lucide="plus" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+            if (typeof lucide !== 'undefined') { lucide.createIcons(); }
+        }
+
+        // --- Cart Functions ---
+
+        function addToCart(itemId) {
+            const existingItem = cart.find(item => item.id === itemId);
+            const foodItem = foodItems.find(item => item.id === itemId);
+
+            if (existingItem) {
+                existingItem.quantity += 1;
+            } else {
+                cart.push({ ...foodItem, quantity: 1 });
+            }
+            updateCartDisplay();
+            showStatusMessage(`Added 1 x ${foodItem.name} to cart.`, 'info');
+        }
+
+        function updateCartItemQuantity(itemId, delta) {
+            const itemIndex = cart.findIndex(item => item.id === itemId);
+            if (itemIndex > -1) {
+                cart[itemIndex].quantity += delta;
+                if (cart[itemIndex].quantity <= 0) {
+                    cart.splice(itemIndex, 1);
+                }
+            }
+            updateCartDisplay();
+        }
+
+        function updateCartDisplay() {
+            const orderTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            
+            cartItemsDiv.innerHTML = '';
+            
+            if (cart.length === 0) {
+                emptyCartMessage.classList.remove('hidden');
+                checkoutButton.disabled = true;
+            } else {
+                emptyCartMessage.classList.add('hidden');
+                checkoutButton.disabled = orderTotal > currentUser.balance;
+
+                cart.forEach(item => {
+                    const itemTotal = item.price * item.quantity;
+                    cartItemsDiv.innerHTML += `
+                        <div class="flex justify-between items-center border-b pb-2">
+                            <span class="text-gray-700">${item.name}</span>
+                            <div class="flex items-center">
+                                <button onclick="updateCartItemQuantity(${item.id}, -1)" class="text-red-500 hover:text-red-700 p-1">
+                                    <i data-lucide="minus-circle" class="w-4 h-4"></i>
+                                </button>
+                                <span class="mx-2 font-bold">${item.quantity}</span>
+                                <button onclick="updateCartItemQuantity(${item.id}, 1)" class="text-blue-500 hover:text-blue-700 p-1">
+                                    <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                                </button>
+                                <span class="ml-4 font-semibold text-gray-800">${formatIndianRupee(itemTotal)}</span>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+            
+            cartTotalSpan.textContent = formatIndianRupee(orderTotal);
+            modalTotal.textContent = formatIndianRupee(orderTotal);
+            
+            if (orderTotal > currentUser.balance) {
+                 checkoutButton.textContent = 'Insufficient Funds';
+                 checkoutButton.classList.remove('bg-green-500', 'hover:bg-green-600');
+                 checkoutButton.classList.add('bg-red-500', 'hover:bg-red-600');
+                 checkoutButton.disabled = true;
+            } else {
+                 checkoutButton.textContent = 'Secure Checkout';
+                 checkoutButton.classList.remove('bg-red-500', 'hover:bg-red-600');
+                 checkoutButton.classList.add('bg-green-500', 'hover:bg-green-600');
+            }
+            
+            if (typeof lucide !== 'undefined') { lucide.createIcons(); }
+        }
+        
+        // --- Payment (Checkout) Functions ---
+        
+        function openPasswordModal() {
+            if (cart.length === 0) return showStatusMessage('Cart is empty. Please add items first.', 'warning');
+            if (cart.reduce((sum, item) => sum + (item.price * item.quantity), 0) > currentUser.balance) return showStatusMessage('Insufficient funds to checkout.', 'error');
+            
+            paymentAdmissionIdInput.value = currentUser.admissionId || '';
+            paymentPasswordInput.value = '';
+            modalMessage.classList.add('hidden');
+            passwordModal.classList.remove('hidden');
+            paymentAdmissionIdInput.focus();
+        }
+
+        function closePasswordModal() {
+            passwordModal.classList.add('hidden');
+        }
+        
+        function updateGlobalStudentData() {
+             if (currentUser.role !== 'student') return;
+
+             let allAdmissions = JSON.parse(localStorage.getItem(ALL_STUDENTS_KEY) || '{}');
+             
+             if (allAdmissions[currentUser.admissionId]) {
+                 const updatedUserData = { 
+                    n: currentUser.name, 
+                    a: currentUser.admissionId, 
+                    e: currentUser.email, 
+                    p: currentUser.password, 
+                    b: currentUser.balance.toFixed(2), 
+                    r: 'student' 
+                };
+                 allAdmissions[currentUser.admissionId] = btoa(JSON.stringify(updatedUserData));
+                 localStorage.setItem(ALL_STUDENTS_KEY, JSON.stringify(allAdmissions));
+             }
+        }
+
+        function processPayment() {
+            const enteredPassword = paymentPasswordInput.value;
+            const enteredAdmissionId = paymentAdmissionIdInput.value.trim();
+            const orderTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            
+            // Validation Check: Now specifically enforcing 5 digits
+            if (enteredPassword.length !== 5 || !enteredAdmissionId) { 
+                modalMessage.textContent = 'Please enter both the Admission ID and a valid 5-digit PIN.';
+                modalMessage.classList.remove('hidden');
+                return;
+            }
+
+            const isIdMatch = enteredAdmissionId === currentUser.admissionId;
+            const isPasswordMatch = enteredPassword === currentUser.password;
+
+            if (isIdMatch && isPasswordMatch) {
+                const SMS_RECIPIENT = '9876543210'; 
+                
+                // Debit wallet
+                currentUser.balance -= orderTotal;
+                currentUser.balance = parseFloat(currentUser.balance.toFixed(2));
+                currentOrderId++;
+                const newTransaction = {
+                    orderId: `CANT${currentOrderId}`,
+                    total: orderTotal,
+                    items: [...cart], 
+                    date: new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+                    type: 'debit'
+                };
+                
+                // Save Transaction to the correct student's history key
+                const studentHistoryKey = `canteen_history_${currentUser.admissionId}`;
+                let studentHistory = localStorage.getItem(studentHistoryKey) ? JSON.parse(localStorage.getItem(studentHistoryKey)) : [];
+                studentHistory.unshift(newTransaction);
+                localStorage.setItem(studentHistoryKey, JSON.stringify(studentHistory));
+                transactionHistory = studentHistory; // Update current view's history array
+
+                // Save updated data to current user's localStorage (for current session continuity)
+                const updatedUserData = { n: currentUser.name, a: currentUser.admissionId, e: currentUser.email, p: currentUser.password, b: currentUser.balance.toFixed(2), r: currentUser.role };
+                localStorage.setItem(LOCAL_STORAGE_KEY, btoa(JSON.stringify(updatedUserData)));
+                
+                // Save updated data to the global student list for persistence across sessions
+                updateGlobalStudentData();
+
+                updateWalletDisplay();
+                closePasswordModal();
+                
+                const smsBody = `ORDER CONFIRMED: Order ${newTransaction.orderId} for ${currentUser.name} (${currentUser.admissionId}). Total paid: ${formatIndianRupee(orderTotal)}. New Balance: ${formatIndianRupee(currentUser.balance)}. Thank you!`;
+                const smsLink = `sms:${SMS_RECIPIENT}?body=${encodeURIComponent(smsBody)}`;
+                const successMessageHTML = `<span>Order ${newTransaction.orderId} Confirmed! New Balance: ${formatIndianRupee(currentUser.balance)}.</span><a href="${smsLink}" class="mt-2 md:mt-0 px-3 py-1 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-md active:scale-[.98]"><i data-lucide="message-square" class="w-3 h-3 inline-block mr-1"></i> Send SMS Receipt</a>`;
+                showStatusMessage(successMessageHTML, 'success');
+
+                cart = [];
+                updateCartDisplay();
+            } else {
+                modalMessage.textContent = 'Invalid Admission ID or PIN. Payment failed.';
+                modalMessage.classList.remove('hidden');
+            }
+        }
+
+        // --- Recharge Functions ---
+
+        function openRechargeModal() {
+            if (currentUser.role !== 'student') return showStatusMessage('Recharge is only available for student wallets.', 'warning');
+            
+            rechargeAmountInput.value = '';
+            upiIdInput.value = '';
+            rechargeMessage.classList.add('hidden');
+            rechargeInfo.innerHTML = `Enter the amount and confirm using your registered email/UPI ID. (Registered Email: <strong>${currentUser.email}</strong>)`;
+            rechargeModal.classList.remove('hidden');
+            rechargeAmountInput.focus();
+        }
+
+        function closeRechargeModal() {
+            rechargeModal.classList.add('hidden');
+        }
+
+        function processUpiRecharge() {
+            const amount = parseFloat(rechargeAmountInput.value);
+            const upiId = upiIdInput.value.trim();
+            const registeredEmail = currentUser.email.toLowerCase();
+
+            if (isNaN(amount) || amount <= 0 || amount < 10) { rechargeMessage.textContent = 'Please enter a valid amount (minimum ₹10).'; rechargeMessage.classList.remove('hidden', 'text-blue-500'); rechargeMessage.classList.add('text-red-500'); return; }
+            if (upiId.toLowerCase() !== registeredEmail) { rechargeMessage.textContent = `Error: The entered UPI ID must match the user's registered email: ${currentUser.email}`; rechargeMessage.classList.remove('hidden', 'text-blue-500'); rechargeMessage.classList.add('text-red-500'); return; }
+
+            rechargeMessage.textContent = `Simulating payment of ${formatIndianRupee(amount)}...`;
+            rechargeMessage.classList.remove('hidden', 'text-red-500');
+            rechargeMessage.classList.add('text-blue-500');
+
+            setTimeout(() => {
+                // Credit wallet
+                currentUser.balance += amount;
+                currentUser.balance = parseFloat(currentUser.balance.toFixed(2));
+                currentOrderId++;
+                const newTransaction = {
+                    orderId: `RECHARGE${currentOrderId}`,
+                    total: amount,
+                    items: [{ name: 'Wallet Top-up (UPI)', quantity: 1, price: amount }], 
+                    date: new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+                    type: 'credit' 
+                };
+                
+                // Save Transaction to the correct student's history key
+                const studentHistoryKey = `canteen_history_${currentUser.admissionId}`;
+                let studentHistory = localStorage.getItem(studentHistoryKey) ? JSON.parse(localStorage.getItem(studentHistoryKey)) : [];
+                studentHistory.unshift(newTransaction);
+                localStorage.setItem(studentHistoryKey, JSON.stringify(studentHistory));
+                transactionHistory = studentHistory; 
+
+                // Save updated data to current user's localStorage
+                const updatedUserData = { n: currentUser.name, a: currentUser.admissionId, e: currentUser.email, p: currentUser.password, b: currentUser.balance.toFixed(2), r: currentUser.role };
+                localStorage.setItem(LOCAL_STORAGE_KEY, btoa(JSON.stringify(updatedUserData)));
+                
+                // Save updated data to the global student list for persistence
+                updateGlobalStudentData();
+
+                updateWalletDisplay();
+                showStatusMessage(`Wallet Recharged! ${formatIndianRupee(amount)} added. New Balance: ${formatIndianRupee(currentUser.balance)}.`, 'success');
+                closeRechargeModal();
+
+            }, 2000); 
+        }
+        
+        // --- History Rendering ---
+
+        function renderHistory(historyData, listElement) {
+            listElement.innerHTML = ''; 
+
+            if (historyData.length === 0) {
+                listElement.innerHTML = '<p class="text-gray-500 italic p-4 text-center">No transactions recorded yet.</p>';
+                return;
+            }
+
+            listElement.innerHTML = historyData.map(transaction => `
+                <div class="p-4 bg-white bg-opacity-70 rounded-xl border ${transaction.type === 'credit' ? 'border-green-300' : 'border-red-300'} shadow-lg hover:shadow-xl transition-shadow duration-200">
+                    <div class="flex justify-between items-center border-b pb-2 mb-2">
+                        <span class="text-lg font-bold text-blue-700">${transaction.orderId}</span>
+                        <span class="text-xl font-extrabold ${transaction.type === 'credit' ? 'text-green-600' : 'text-red-600'}">
+                            ${transaction.type === 'credit' ? '+' : '-'} ${formatIndianRupee(transaction.total)}
+                        </span>
+                    </div>
+                    <div class="text-sm text-gray-500 mb-3 flex items-center">
+                        <i data-lucide="clock" class="w-4 h-4 mr-1"></i>
+                        <span>${transaction.date}</span>
+                    </div>
+                    <p class="font-semibold text-gray-700 mb-1">Items/Reason:</p>
+                    <ul class="list-disc list-inside space-y-0.5 text-sm text-gray-600 pl-4">
+                        ${transaction.items.map(item => `
+                            <li>${item.quantity} x ${item.name} (${formatIndianRupee(item.price * item.quantity)})</li>
+                        `).join('')}
+                    </ul>
+                </div>
+            `).join('');
+            
+            if (typeof lucide !== 'undefined') { lucide.createIcons(); }
+        }
+    </script>
+</body>
+</html>

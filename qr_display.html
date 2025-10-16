@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Digital Wallet QR ID</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrious/dist/qrious.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #e8ecf1, #f2f5f9);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .glass-container {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(16px) saturate(180%);
+            -webkit-backdrop-filter: blur(16px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body onload="initQR()">
+
+    <div id="mainWrapper" class="glass-container w-full max-w-lg rounded-2xl p-6 md:p-8">
+        <div id="statusBar" class="p-3 rounded-xl font-medium hidden transition-all duration-300 text-sm mb-4"></div>
+
+        <div id="qrView" class="max-w-md mx-auto text-center">
+            <h2 id="titleText" class="text-2xl font-bold text-gray-800 mb-4"></h2>
+            <p id="qrMessage" class="text-sm text-gray-600 mb-6"></p>
+            
+            <div id="mainQRSection">
+                <div class="p-6 bg-white rounded-xl shadow-2xl inline-block border border-gray-200">
+                    <a id="statusLink" href="#" class="inline-block hover:scale-[1.03] transition-transform duration-300">
+                        <canvas id="qrCanvas" width="250" height="250" class="rounded-lg shadow-md"></canvas>
+                    </a>
+                </div>
+                <div id="qrUserDetails" class="mt-4 text-gray-700"></div>
+            </div>
+
+            <div id="staffOptions" class="mt-6 space-y-3 hidden">
+                <p class="text-gray-700 font-semibold text-lg">Staff Access Options</p>
+                <p class="text-sm text-gray-500 pb-2">Select the type of access you need.</p>
+
+                <button onclick="goToStaffUnlock('staff')"
+                        class="flex items-center justify-center w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg transition duration-150 shadow-md">
+                    <i data-lucide="scan" class="w-4 h-4 mr-3"></i>
+                    Generate Staff Access QR **(Transactions)**
+                </button>
+                
+                <button onclick="goToStaffUnlock('admin')"
+                        class="flex items-center justify-center w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg transition duration-150 shadow-md">
+                    <i data-lucide="lock" class="w-4 h-4 mr-3"></i>
+                    Login to Admin Panel (Password Only)
+                </button>
+                
+                <button onclick="resetDisplay()" 
+                        class="mt-4 text-sm text-blue-500 hover:text-blue-700 block mx-auto">
+                    &larr; Back to Staff ID
+                </button>
+            </div>
+            
+            <button onclick="clearAndSaveRecoveryData()" 
+                    class="mt-6 text-sm text-red-500 hover:text-red-700 block mx-auto">
+                Clear ID and Go Back to Registration
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const LOCAL_STORAGE_KEY = 'canteen_user_data';
+        let currentUserRole = null;
+
+        function initQR() {
+            const savedData = localStorage.getItem(LOCAL_STORAGE_KEY);
+            const qrCanvas = document.getElementById('qrCanvas');
+            const qrUserDetails = document.getElementById('qrUserDetails');
+            const titleText = document.getElementById('titleText');
+            const qrMessage = document.getElementById('qrMessage');
+            const statusLink = document.getElementById('statusLink');
+
+            if (!savedData) {
+                qrMessage.textContent = "ID not found. Redirecting to registration...";
+                setTimeout(() => {
+                    window.location.href = 'registration.html';
+                }, 1000);
+                return;
+            }
+
+            try {
+                const loadedUserData = JSON.parse(atob(savedData));
+                currentUserRole = loadedUserData.r; // Save the role globally
+                
+                new QRious({
+                    element: qrCanvas,
+                    value: savedData, 
+                    size: 250
+                });
+                
+                if (currentUserRole === 'staff') {
+                    titleText.textContent = "Your Staff Digital ID";
+                    qrMessage.textContent = "**Tap the QR Code** for access options.";
+                    statusLink.href = "#"; 
+                    statusLink.onclick = showStaffOptions; 
+                } else {
+                    titleText.textContent = "Your Student Digital ID";
+                    qrMessage.textContent = "**Scan this code at the counter.** Click it to view your balance and history.";
+                    statusLink.href = "canteen.html";
+                    statusLink.onclick = null;
+                }
+
+                qrUserDetails.innerHTML = `
+                    <p class="font-bold text-lg">${loadedUserData.n}</p>
+                    <p class="text-blue-500">ID: ${loadedUserData.a}</p>
+                `;
+            } catch (e) {
+                qrMessage.textContent = "Error loading user data. Please re-register.";
+            }
+
+            if (typeof lucide !== 'undefined') { lucide.createIcons(); }
+        }
+
+        // NEW FUNCTION: Shows staff options and hides the QR
+        function showStaffOptions(event) {
+            event.preventDefault(); // Stop the link from acting like a link
+            
+            if (currentUserRole !== 'staff') return; // Only for staff
+
+            document.getElementById('mainQRSection').classList.add('hidden');
+            document.getElementById('staffOptions').classList.remove('hidden');
+            document.getElementById('titleText').textContent = "Staff Access";
+            document.getElementById('qrMessage').textContent = "Choose your required access level.";
+        }
+
+        // NEW FUNCTION: Resets the display back to the QR code
+        function resetDisplay() {
+            document.getElementById('staffOptions').classList.add('hidden');
+            document.getElementById('mainQRSection').classList.remove('hidden');
+            document.getElementById('titleText').textContent = "Your Staff Digital ID";
+            document.getElementById('qrMessage').textContent = "**Tap the QR Code** for access options.";
+        }
+
+        function goToStaffUnlock(accessType) {
+            if (accessType === 'admin') {
+                window.location.href = `admin_login.html`;
+            } else {
+                // 'staff' access is for transactional unlocking
+                window.location.href = `staff_unlock_qr.html?access=${accessType}`;
+            }
+        }
+
+        function clearAndSaveRecoveryData() {
+            const savedData = localStorage.getItem(LOCAL_STORAGE_KEY);
+            if (savedData) {
+                try {
+                    const loadedUserData = JSON.parse(atob(savedData));
+                    const recoveryData = { a: loadedUserData.a, e: loadedUserData.e };
+                    localStorage.setItem('canteen_recovery_data', JSON.stringify(recoveryData));
+                } catch (e) {
+                    console.error("Error saving recovery data:", e);
+                }
+            }
+            
+            localStorage.removeItem(LOCAL_STORAGE_KEY);
+            localStorage.removeItem('canteen_history');
+            window.location.href = 'registration.html'; 
+        }
+    </script>
+</body>
+</html>
